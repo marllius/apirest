@@ -1,0 +1,415 @@
+---
+# yamllint disable rule:line-length
+# yamllint disable rule:comments-indentation
+
+# Proxy variables (optional) for download packages using a proxy server
+proxy_env: {}
+#  http_proxy: http://10.128.64.9:3128
+#  https_proxy: http://10.128.64.9:3128
+
+# -------------------------------------------
+
+# Repository
+apt_repository_keys:
+  - key: "https://www.postgresql.org/media/keys/ACCC4CF8.asc"  # postgresql repository apt key
+apt_repository:
+  - repo: "deb https://apt.postgresql.org/pub/repos/apt/ {{ ansible_distribution_release }}-pgdg main"  # postgresql apt repository
+
+# Packages (for apt repo)
+os_specific_packages:
+  Ubuntu-20: [python3]  # python 2 is not required
+system_packages:
+  - "{{ os_specific_packages[ansible_distribution ~ '-' ~ ansible_distribution_major_version] }}"
+  - python3
+  - python3-dev
+  - python3-psycopg2
+  - python3-setuptools
+  - python3-pip
+  - curl
+  - less
+  - sudo
+  - vim
+  - gcc
+  - jq
+  - iptables
+  - acl
+  - net-tools
+  - libpq-dev
+
+postgresql_packages:
+  - postgresql-{{ postgresql_version }}
+#  - postgresql-{{ postgresql_version }}-repack"
+
+# Extra packages
+etcd_package_repo: "https://github.com/etcd-io/etcd/releases/download/{{ etcd_ver }}/etcd-{{ etcd_ver }}-linux-amd64.tar.gz"
+confd_package_repo: "https://github.com/kelseyhightower/confd/releases/download/v0.16.0/confd-0.16.0-linux-amd64"
+
+synchronous_mode: false  # or 'true' for enable synchronous database replication
+synchronous_mode_strict: false  # if 'true' then block all client writes to the master, when a synchronous replica is not available
+synchronous_node_count: 0  # number of synchronous standby databases
+
+deploy_app: true # 'false' if you don't want to deploy
+
+# Load Balancing
+haproxy_listen_port:
+  master: 5000
+  replicas: 5001
+  replicas_sync: 5002
+  replicas_async: 5003
+  stats: 7000
+haproxy_maxconn:
+  global: 100000
+  master: 10000
+  replica: 10000
+haproxy_timeout:
+  client: "60m"
+  server: "60m"
+
+# DCS (Distributed Consensus Store)
+dcs_exists: false  # or 'true' if you do not want to install and configure the etcd cluster
+dcs_type: "etcd"
+
+# if dcs_exists: false and dcs_type: "etcd"
+etcd_ver: "v3.3.27"  # version for deploy etcd cluster
+etcd_data_dir: "/var/lib/etcd"
+etcd_cluster_name: "etcd-{{ patroni_cluster_name }}"  # ETCD_INITIAL_CLUSTER_TOKEN
+
+# if dcs_exists: true and dcs_type: "etcd" - specify ip address your etcd cluster in the "patroni_etcd_hosts" variable
+# example (use existing cluster of 3 nodes)
+patroni_etcd_hosts: []
+#patroni_etcd_hosts: 
+#  - { host: "192.168.122.194", port: "2379" }
+#  - { host: "192.168.122.244", port: "2379" }
+#  - { host: "192.168.122.93", port: "2379" }
+
+# PostgreSQL variables
+postgresql_version: "13"
+postgresql_cluster_name: "main"
+#postgresql_data_dir: "/var/lib/postgresql/{{ postgresql_version }}/{{ postgresql_cluster_name }}"  # You can specify custom data dir path
+postgresql_data_dir: "/pg/{{ postgresql_version }}/data"
+postgresql_conf_dir: "/etc/postgresql/{{ postgresql_version }}/{{ postgresql_cluster_name }}"
+postgresql_bin_dir: "/usr/lib/postgresql/{{ postgresql_version }}/bin"
+postgresql_log_dir: "/var/log/postgresql"
+postgresql_wal_dir: ""  # custom WAL dir path (symlink will be created) [optional]
+postgresql_unix_socket_dir: "/var/run/postgresql"
+postgresql_home_dir: "/home/postgres"
+postgresql_port: "5432"
+postgresql_master: "192.168.122.23" # for pgbackrest dedicated host
+#postgresql_master: "192.168.122.93"
+postgresql_encoding: "UTF8"  # for bootstrap only (initdb)
+postgresql_locale: "en_US.UTF-8"  # for bootstrap only (initdb)
+postgresql_data_checksums: true  # for bootstrap only (initdb)
+postgresql_password_encryption_algorithm: "md5"  # 'scram-sha-256' or "md5"
+
+
+# stats_temp_directory (mount the statistics directory in tmpfs)
+#postgresql_stats_temp_directory_path: "/pg/13/pgsql_stats_tmp"  # or 'none'
+postgresql_stats_temp_directory_path: "none"  # or 'none'
+postgresql_stats_temp_directory_size: "1024m"
+
+# list of users to be created (if not already exists)
+# It's necessy create at least 1 user as superuser, on this configuration set, the user postgres only can be acessible by login into the host or ssh key
+# if you install elephant-sed, postgres user can be used
+postgresql_users: 
+  - {name: "dba", password: "dba", flags: "SUPERUSER"} # for administration
+  - {name: "api_app", password: "api#123", flags: "LOGIN"} # for apirestfull aplication
+  - {name: "replication", password: "replication", flags: "REPLICATION"} # for replication
+  - {name: "{{ pgbouncer_user }}", password: "{{ pgbouncer_password }}", flags: "LOGIN"} # for pgbouncer login
+#  - {name: "", password: "", flags: "NOSUPERUSER"}
+#  - {name: "", password: "", flags: "NOLOGIN"}
+
+# (optional) list of databases to be created (if not already exists)
+#postgresql_databases: []
+postgresql_databases: 
+  - {db: "api", encoding: "UTF8", lc_collate: "en_US.UTF-8", lc_ctype: "en_US.UTF-8", owner: "api_app", state: "restore", target_file: "/tmp/api.sql"}  #for apirestfull
+  - {db: "postgres", encoding: "UTF8", lc_collate: "en_US.UTF-8", lc_ctype: "en_US.UTF-8", owner: "postgres", state: "present", target_file: ""}
+#  - {db: "", encoding: "UTF8", lc_collate: "en_US.UTF-8", lc_ctype: "en_US.UTF-8", owner: ""}
+
+# (optional) list of database extensions to be created (if not already exists)
+#postgresql_extensions: []
+postgresql_extensions: 
+  - {ext: "pg_stat_statements", db: "postgres"}
+#  - {ext: "pg_stat_statements", db: "pgbouncer"}  
+#  - {ext: "pg_stat_statements", db: "mydatabase"}
+#  - {ext: "pg_stat_statements", db: ""}
+#  - {ext: "pg_stat_statements", db: ""}
+#  - {ext: "pg_repack", db: ""}  # postgresql-<version>-repack package is required
+#  - {ext: "pg_stat_kcache", db: ""}  # postgresql-<version>-pg-stat-kcache package is required
+#  - {ext: "", db: ""}
+#  - {ext: "", db: ""}
+
+
+# postgresql parameters to bootstrap dcs (are parameters for example)
+postgresql_parameters:
+  - {option: "max_connections", value: "100"}
+  - {option: "superuser_reserved_connections", value: "5"}
+  - {option: "password_encryption", value: "{{ postgresql_password_encryption_algorithm }}"}
+  - {option: "max_locks_per_transaction", value: "64"}  # raise this value (ex. 512) if you have queries that touch many different tables (partitioning)
+  - {option: "max_prepared_transactions", value: "0"}
+  - {option: "huge_pages", value: "try"}  # or "on" if you set "vm_nr_hugepages" in kernel parameters
+  - {option: "shared_buffers", value: "512MB"}  # please change this value
+  - {option: "work_mem", value: "8MB"}  # please change this value
+  - {option: "maintenance_work_mem", value: "256MB"}  # please change this value
+  - {option: "effective_cache_size", value: "1724MB"}  # please change this value
+  - {option: "checkpoint_timeout", value: "15min"}
+  - {option: "checkpoint_completion_target", value: "0.9"}
+  - {option: "min_wal_size", value: "2GB"}
+  - {option: "max_wal_size", value: "4GB"}
+  - {option: "wal_buffers", value: "32MB"}
+  - {option: "default_statistics_target", value: "1000"}
+  - {option: "seq_page_cost", value: "1"}
+  - {option: "random_page_cost", value: "1.1"}  
+  - {option: "effective_io_concurrency", value: "200"}  # "200" for SSD storage
+  - {option: "synchronous_commit", value: "on"}  # or 'off' if you can you lose single transactions in case of a crash
+  - {option: "autovacuum", value: "on"}
+  - {option: "autovacuum_max_workers", value: "5"}
+  - {option: "autovacuum_vacuum_scale_factor", value: "0.1"}  # or 0.005/0.001
+  - {option: "autovacuum_analyze_scale_factor", value: "0.1"}
+  - {option: "autovacuum_vacuum_cost_limit", value: "500"}  # or 1000/5000
+  - {option: "autovacuum_vacuum_cost_delay", value: "2"}
+  - {option: "autovacuum_naptime", value: "1s"}
+  - {option: "max_files_per_process", value: "4096"}
+  - {option: "archive_mode", value: "on"}
+  - {option: "archive_timeout", value: "1800s"}
+#  - {option: "archive_command", value: "cd ."}  # not doing anything yet with WAL-s
+  - {option: "archive_command", value: "pgbackrest --stanza={{ pgbackrest_stanza }} archive-push %p"}  # archive WAL-s using pgbackrest
+  - {option: "wal_level", value: "replica"}
+  - {option: "wal_keep_size", value: "2GB"}
+  - {option: "max_wal_senders", value: "130"}
+  - {option: "max_replication_slots", value: "10"}
+  - {option: "hot_standby", value: "on"}
+  - {option: "wal_log_hints", value: "on"}
+  - {option: "wal_compression", value: "off"}
+  - {option: "shared_preload_libraries", value: "pg_stat_statements"}
+  - {option: "pg_stat_statements.max", value: "10000"}
+  - {option: "pg_stat_statements.track", value: "all"}
+  - {option: "pg_stat_statements.track_utility", value: "false"}
+  - {option: "pg_stat_statements.save", value: "true"}
+  - {option: "track_io_timing", value: "on"}
+  - {option: "log_lock_waits", value: "on"}
+  - {option: "log_temp_files", value: "0"}
+  - {option: "track_activities", value: "on"}
+  - {option: "track_counts", value: "on"}
+  - {option: "track_functions", value: "all"}
+  - {option: "log_checkpoints", value: "on"}
+  - {option: "logging_collector", value: "on"}
+  - {option: "log_truncate_on_rotation", value: "on"}
+  - {option: "log_rotation_age", value: "1h"}
+  - {option: "log_rotation_size", value: "1GB"}
+  - {option: "log_line_prefix", value: "'%t [%p]: user=%u,db=%d,app=%a,client=%h '"}
+  - {option: "log_filename", value: "'postgresql-%Y-%m-%d_%H.log'"}
+  - {option: "log_directory", value: "{{ postgresql_log_dir }}"}
+  - {option: "hot_standby_feedback", value: "on"}  # allows feedback from a hot standby to the master that will avoid query conflicts
+  - {option: "max_standby_streaming_delay", value: "30s"}
+  - {option: "wal_receiver_status_interval", value: "10s"}
+  - {option: "idle_in_transaction_session_timeout", value: "10min"}  # reduce this timeout if possible
+  - {option: "jit", value: "on"}
+
+
+# specify additional hosts that will be added to the pg_hba.conf
+postgresql_pg_hba:
+  #- {type: "local", database: "all", user: "postgres", address: "", method: "trust"}  # "local=trust" required for ansible modules "postgresql_(user,db,ext)"
+  - {type: "local", database: "all", user: "postgres", address: "", method: "trust"}  # "local=trust" required for ansible modules "postgresql_(user,db,ext)"
+  - {type: "local", database: "all", user: "all", address: "", method: "peer"}
+  - {type: "host", database: "all", user: "all", address: "127.0.0.1/32", method: "{{ postgresql_password_encryption_algorithm }}"}
+  - {type: "host", database: "all", user: "all", address: "::1/128", method: "{{ postgresql_password_encryption_algorithm }}"}
+
+# list of lines that Patroni will use to generate pg_ident.conf
+postgresql_pg_ident: []
+#  - {mapname: "main", system_username: "postgres", pg_username: "backup"}
+#  - {mapname: "", system_username: "", pg_username: ""}
+
+# PgBouncer parameters
+pgbouncer_install: true  # or 'false' if you do not want to install and configure the pgbouncer service
+pgbouncer_conf_dir: "/etc/pgbouncer"
+pgbouncer_log_dir: "/var/log/pgbouncer"
+pgbouncer_listen_port: 6432
+pgbouncer_max_client_conn: 10000
+pgbouncer_max_db_connections: 1000
+pgbouncer_default_pool_size: 20
+pgbouncer_default_pool_mode: "session"
+pgbouncer_generate_userlist: true  # generate the authentication file (userlist.txt) from the pg_shadow system table 
+pgbouncer_auth_query: true  # generate the authentication file (userlist.txt) from the pg_shadow system table only for user pgbouncer
+pgbouncer_auth_type: "{{ postgresql_password_encryption_algorithm }}"
+pgbouncer_user: "pgbouncer" # preferably a linux non-superuser
+pgbouncer_password: "pgbouncer" # please change password
+pgbouncer_admin_users: 
+  - {name: "postgres"}
+  - {name: "{{ pgbouncer_user }}" }
+  - {name: "dba"}
+#  - {name: ""}  
+
+pgbouncer_pools: []
+#  - {name: "postgres", dbname: "postgres", pool_parameters: ""}
+#  - {name: "postgres", dbname: "postgres", pool_parameters: ""} # for administrive propose
+#  - {name: "mydatabase", dbname: "mydatabase", pool_parameters: "pool_size=20 pool_mode=transaction"}
+#  - {name: "", dbname: "", pool_parameters: ""}
+#  - {name: "", dbname: "", pool_parameters: ""}
+
+# Cluster variables
+cluster_vip: "192.168.122.2"  # ip address for client access to databases in the cluster
+vip_interface: "{{ ansible_default_ipv4.interface }}"  # interface name (ex. "ens32")
+
+# Cluster variables
+patroni_cluster_name: "postgres-cluster"  # specify the cluster name
+patroni_install_version: "latest"  # or specific version (example 1.5.6)
+patroni_superuser_username: "postgres"
+patroni_superuser_password: "postgres"  # please change password
+patroni_replication_username: "replication"
+patroni_replication_password: "replication"  # please change password
+
+patroni_installation_method: "pip"  # "pip" or "deb"
+
+# (if patroni_installation_type: "pip")
+# Packages from your repository will be used to install instead of the pip repository.
+pip_package_repo: "https://bootstrap.pypa.io/get-pip.py"  # latest version pip3 for python3 (or use "pip-<version>.tar.gz").
+patroni_pip_requirements_repo: []
+#  - "http://my-repo.url/setuptools-41.2.0.zip"
+#  - "http://my-repo.url/setuptools_scm-3.3.3.tar.gz"
+#  - "http://my-repo.url/urllib3-1.24.3.tar.gz"
+#  - "http://my-repo.url/boto-2.49.0.tar.gz"  # (interfaces to Amazon Web Services)
+#  - "http://my-repo.url/PyYAML-5.1.2.tar.gz"
+#  - "http://my-repo.url/chardet-3.0.4.tar.gz"
+#  - "http://my-repo.url/idna-2.8.tar.gz"
+#  - "http://my-repo.url/certifi-2019.9.11.tar.gz"
+#  - "http://my-repo.url/requests-2.22.0.tar.gz"
+#  - "http://my-repo.url/six-1.12.0.tar.gz"
+#  - "http://my-repo.url/kazoo-2.6.1.tar.gz"
+#  - "http://my-repo.url/dnspython-1.16.0.zip"
+#  - "http://my-repo.url/python-etcd-0.4.5.tar.gz"
+#  - "http://my-repo.url/Click-7.0.tar.gz"
+#  - "http://my-repo.url/prettytable-0.7.2.tar.gz"
+#  - "http://my-repo.url/pytz-2019.2.tar.gz"
+#  - "http://my-repo.url/tzlocal-2.0.0.tar.gz"
+#  - "http://my-repo.url/wheel-0.33.6.tar.gz"
+#  - "http://my-repo.url/python-dateutil-2.8.0.tar.gz"
+#  - "http://my-repo.url/psutil-5.6.3.tar.gz"
+#  - "http://my-repo.url/cdiff-1.0.tar.gz"
+patroni_pip_package_repo: []
+# - "http://my-repo.url/patroni-1.6.0.tar.gz"
+
+# ( if patroni_installation_type: "deb" )
+# You can preload the patroni deb package to your APT repository, or explicitly specify the path to the package in this variable:
+patroni_deb_package_repo: []
+#  - "https://apt.postgresql.org/pub/repos/apt/pool/main/p/patroni/patroni_1.6.5-2.pgdg100%2B1_all.deb"  # (package for Debian 10)
+
+# Extended variables (optional)
+patroni_ttl: 30
+patroni_loop_wait: 10
+patroni_retry_timeout: 10
+patroni_maximum_lag_on_failover: 1048576
+patroni_master_start_timeout: 300
+
+# https://patroni.readthedocs.io/en/latest/replica_bootstrap.html#standby-cluster
+patroni_standby_cluster:
+  host: ""  # an address of remote master
+  port: "5432"  # a port of remote master
+#  primary_slot_name: ""  # which slot on the remote master to use for replication (optional)
+#  restore_command: ""  # command to restore WAL records from the remote master to standby leader (optional)
+#  recovery_min_apply_delay: ""  # how long to wait before actually apply WAL records on a standby leader (optional)
+
+patroni_log_destination: logfile  # 'stderr' or 'logfile'
+# if patroni_log_destination: logfile
+patroni_log_dir: /var/log/patroni
+patroni_log_level: info
+patroni_log_traceback_level: error
+patroni_log_format: "%(asctime)s %(levelname)s: %(message)s"
+patroni_log_dateformat: ""
+patroni_log_max_queue_size: 1000
+patroni_log_file_num: 4
+patroni_log_file_size: 25000000  # bytes
+patroni_log_loggers_patroni_postmaster: warning
+patroni_log_loggers_urllib3: warning  # 'warning' or 'debug'
+
+patroni_postgresql_use_pg_rewind: true  # 'true' or 'false'
+# try to use pg_rewind on the former leader when it joins cluster as a replica.
+
+patroni_remove_data_directory_on_rewind_failure: false  # 'false' or 'true' (if use_pg_rewind: 'true')
+# avoid removing the data directory on an unsuccessful rewind
+# if 'true', Patroni will remove the PostgreSQL data directory and recreate the replica.
+
+patroni_remove_data_directory_on_diverged_timelines: false  # 'false' or 'true'
+# if 'true', Patroni will remove the PostgreSQL data directory and recreate the replica
+# if it notices that timelines are diverging and the former master can not start streaming from the new master.
+
+# https://patroni.readthedocs.io/en/latest/replica_bootstrap.html#bootstrap
+patroni_cluster_bootstrap_method: "initdb"  # initdb or "pgbackrest"
+
+# https://patroni.readthedocs.io/en/latest/replica_bootstrap.html#building-replicas
+patroni_create_replica_methods:
+  - basebackup
+  - pgbackrest   
+
+pgbackrest:
+  - {option: "command", value: "/usr/bin/pgbackrest --stanza={{ pgbackrest_stanza }} --delta restore"}
+  - {option: "keep_data", value: "True"}
+  - {option: "no_params", value: "True"}
+basebackup:
+  - {option: "max-rate", value: "100M"}
+  - {option: "checkpoint", value: "fast"}
+
+
+# "restore_command" written to recovery.conf when configuring follower (create replica)
+postgresql_restore_command: ""
+#postgresql_restore_command: "pgbackrest --stanza={{ pgbackrest_stanza }} archive-get %f %p"  # restore WAL-s using pgbackrest
+
+# pgBackRest
+pgbackrest_install: true  # 'false' or 'true'
+pgbackrest_install_from_pgdg_repo: true  # or 'false'
+pgbackrest_stanza: "postgresql-cluster"  # specify your --stanza
+pgbackrest_repo_type: "posix"  # or "s3"
+pgbackrest_repo_host: "192.168.122.6"  # dedicated repository host (if repo_type: "posix")
+#pgbackrest_repo_host: "192.168.122.195"
+pgbackrest_repo_user: "pgbackrest"  # if "repo_host" is set
+pgbackrest_home_dir: "/home/{{ pgbackrest_repo_user }}" # change home directory for user pgbackrest
+pgbackrest_conf_file: "/etc/pgbackrest.conf"
+pgbackrest_conf_dir: "/etc/"
+pgbackrest_bkp_dir: /var/lib/pgbackrest
+pgbackrest_log_dir: /var/log/pgbackrest
+pgbackrest_retention_full_bkp: "2" # total backups + 1 to host 
+pgbackrest_retention_full_type: "count" # 'count' for how many bkp or 'time' to use days instead
+pgbackrest_start_fast: "y" 
+pgbackrest_compress_level: "3"
+
+# see more options https://pgbackrest.org/configuration.html
+pgbackrest_conf:
+  global:  # [global] section
+    - {option: "log-level-file", value: "detail"}
+    - {option: "log-path", value: "/var/log/pgbackrest"}
+    - {option: "repo1-type", value: "{{ pgbackrest_repo_type |lower }}"}
+    - {option: "repo1-host", value: "{{ pgbackrest_repo_host }}"}
+    - {option: "repo1-host-user", value: "{{ pgbackrest_repo_user }}"}
+#    - {option: "", value: ""}
+  stanza:  # [stanza_name] section
+    - {option: "pg1-path", value: "{{ postgresql_data_dir }}"}
+    - {option: "process-max", value: "2"}
+    - {option: "recovery-option", value: "recovery_target_action=promote"}
+    - {option: "compress-level", value: "{{ pgbackrest_compress_level }}"}
+#    - {option: "", value: ""}
+
+# this is the pgbackrest config file on pgbackrest dedicated host
+pgbackrest_conf_host:
+  global:  # [global] section
+    - {option: "repo1-path", value: "{{ pgbackrest_bkp_dir }}"}
+    - {option: "repo1-retention-full", value: "{{ pgbackrest_retention_full_bkp }}"}
+    - {option: "repo1-retention-full-type", value: "{{ pgbackrest_retention_full_type }}"}    
+    - {option: "start-fast", value: "{{ pgbackrest_start_fast }}"}
+#    - {option: "", value: ""}
+  stanza:  # [stanza_name] section
+    - {option: "pg1-path", value: "{{ postgresql_data_dir }}"}   
+    - {option: "pg1-host", value: "{{ postgresql_master }}"}
+#    - {option: "", value: ""}
+
+
+pgbackrest_patroni_cluster_restore_command:
+  '/usr/bin/pgbackrest --stanza={{ pgbackrest_stanza }} --delta restore'  # restore from latest backup
+#  '/usr/bin/pgbackrest --stanza={{ pgbackrest_stanza }} --type=time "--target=2020-06-01 11:00:00+03" --delta restore'  # Point-in-Time Recovery (example)
+
+# PITR mode (if patroni_cluster_bootstrap_method: "pgbackrest"):
+# 1) The database cluster directory will be overwritten (for "pgbackrest" --delta restore).
+# 2) And also the patroni cluster "{{ patroni_cluster_name }}" will be removed from the DCS (if exist) before recovery.
+
+disable_archive_command: true  # or 'false' to not disable archive_command after restore
+keep_patroni_dynamic_json: true  # or 'false' to remove patroni.dynamic.json after restore (if exists)
+
+...

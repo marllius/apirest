@@ -1,0 +1,29 @@
+---
+
+- name: Generate locales
+  become: true
+  locale_gen:
+    name: "{{ item.language_country }}.{{ item.encoding }}"
+    state: present
+  loop: "{{ locale_gen | flatten(1) }}"
+
+- block:
+    - name: Set locale "{{ locale }}" into /etc/default/locale
+      lineinfile:
+        dest: "/etc/default/locale"
+        regexp: "{{ item.regexp }}"
+        line: "{{ item.line }}"
+        owner: root
+        group: root
+        mode: '0644'
+      loop:
+        - {regexp: '^LANG=', line: 'LANG={{ locale }}'}
+        - {regexp: '^LANGUAGE=', line: 'LANGUAGE={{ locale }}'}
+        - {regexp: '^LC_ALL=', line: 'LC_ALL={{ locale }}'}
+      loop_control:
+        label: "{{ item.line }}"
+
+  ignore_errors: true
+  when: locale is defined and locale | length > 0
+
+...

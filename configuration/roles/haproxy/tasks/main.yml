@@ -1,0 +1,135 @@
+---
+# yamllint disable rule:line-length
+
+
+# from repo
+- block:
+    - name: Add ppa:vbernat/haproxy-1.8 repository apt-key
+      apt_key:  # https://github.com/ansible/ansible/issues/31691
+        data: |
+          -----BEGIN PGP PUBLIC KEY BLOCK-----
+
+          xo0EUa70wAEEAMtI29s01PCX0JleVmh1QQr3rfPkfGo/GFKfcXRGE40nQHq+rWUh
+          9slUN+kXBckSE0DDrnQH08Uvf12TJiHHFlbXnH5Ep+hgYPZGlVSpvBGO+c/CopU7
+          RHMx9bl+pVOhrVeDWqLl2KqJI2wjJBLXA0dbRbCzmXPvrg3mBQ0hZ533ABEBAAHN
+          IExhdW5jaHBhZCBQUEEgZm9yIFZpbmNlbnQgQmVybmF0wrgEEwECACIFAlGu9MAC
+          GwMGCwkIBwMCBhUIAgkKCwQWAgMBAh4BAheAAAoJEFBdl6QcYbnN8aMD/RM3InMu
+          bxTF9hzToCPF2EP37Q9WUQNF15f90jTOl8VqqpnUfGd2qlxUW31soCpDVxqX6lXf
+          qB0bI9EDz2r7w+goxBH+cRArJ2APdC7wE/U9eIxY49mzNsqjsl7zY+eoX4v4fjqk
+          33hFyMMJDUtPxSRHWFqP5QNwCN+fbPh5GiyL
+          =ZiOf
+          -----END PGP PUBLIC KEY BLOCK-----
+        state: present
+      when: ansible_distribution == 'Ubuntu' and
+            ansible_distribution_major_version is version('18', '<=')
+
+    - name: Add ppa:vbernat/haproxy-1.8 repository
+      apt_repository:
+        repo: "deb http://ppa.launchpad.net/vbernat/haproxy-1.8/ubuntu {{ ansible_distribution_release }} main"
+        state: present
+        update_cache: true
+      when: ansible_distribution == 'Ubuntu' and
+            ansible_distribution_major_version is version('18', '<=')
+
+    - name: Install HAProxy v1.8 package
+      apt:
+        force_apt_get: true
+        name: "haproxy=1.8.*"
+        state: present
+      when: ansible_distribution == 'Ubuntu' and ansible_distribution_major_version is version('18', '<=')
+
+    - name: Install HAProxy package
+      apt:
+        name: haproxy
+        state: present
+      when: ansible_distribution == 'Ubuntu' and ansible_distribution_major_version is version('20', '>=')
+  environment: "{{ proxy_env | default({}) }}"
+
+# Configure
+- name: Make sure the kernel parameter "net.ipv4.ip_nonlocal_bind" are enabled
+  sysctl:
+    name: "net.ipv4.ip_nonlocal_bind"
+    value: "1"
+    sysctl_set: true
+    state: present
+    reload: true
+  ignore_errors: true  # to prevent test failures in CI
+
+- name: Add haproxy group
+  group:
+    name: haproxy
+    state: present
+
+- name: Add haproxy user
+  user:
+    name: haproxy
+    comment: "HAProxy user"
+    group: haproxy
+    shell: /usr/sbin/nologin
+
+- name: Create directories
+  file:
+    dest: "{{ item }}"
+    state: directory
+    owner: haproxy
+    group: haproxy
+  loop:
+    - /etc/haproxy
+    - /var/run/haproxy
+    - /var/lib/haproxy/dev
+
+- name: Generate conf file "/etc/haproxy/haproxy.cfg"
+  template:
+    src: templates/haproxy.cfg.j2
+    dest: /etc/haproxy/haproxy.cfg
+    owner: haproxy
+    group: haproxy
+  notify: "restart haproxy"
+  when: add_balancer is not defined or not add_balancer|bool
+
+- name: Generate systemd service file "/etc/systemd/system/haproxy.service"
+  template:
+    src: templates/haproxy.service.j2
+    dest: /etc/systemd/system/haproxy.service
+    owner: haproxy
+    group: haproxy
+  notify: "restart haproxy"
+
+- block:  # for add_balancer.yml
+    - name: Fetch haproxy.cfg file
+      run_once: true
+      fetch:
+        src: /etc/haproxy/haproxy.cfg
+        dest: files/haproxy.cfg
+        validate_checksum: true
+        flat: true
+      notify: "restart haproxy"
+      delegate_to: "{{ groups.balancers[0] }}"
+
+    - name: Copy haproxy.cfg file to replica
+      copy:
+        src: files/haproxy.cfg
+        dest: /etc/haproxy/haproxy.cfg
+        owner: haproxy
+        group: haproxy
+      notify: "restart haproxy"
+
+    - name: Prepare haproxy.cfg conf file (replace "bind")
+      lineinfile:
+        path: /etc/haproxy/haproxy.cfg
+        regexp: "{{ item.regexp }}"
+        line: "{{ item.line }}"
+        backrefs: true
+      loop:
+        - {regexp: '^.*bind.*:{{ haproxy_listen_port.stats }}$', line: '    bind {{ hostvars[inventory_hostname].inventory_hostname }}:{{ haproxy_listen_port.stats }}'}  # noqa 204
+        - {regexp: '^.*bind.*:{{ haproxy_listen_port.master }}$', line: '    bind {{ hostvars[inventory_hostname].inventory_hostname }}:{{ haproxy_listen_port.master }}'}  # noqa 204
+        - {regexp: '^.*bind.*:{{ haproxy_listen_port.replicas }}$', line: '    bind {{ hostvars[inventory_hostname].inventory_hostname }}:{{ haproxy_listen_port.replicas }}'}  # noqa 204
+        - {regexp: '^.*bind.*:{{ haproxy_listen_port.replicas_sync }}$', line: '    bind {{ hostvars[inventory_hostname].inventory_hostname }}:{{ haproxy_listen_port.replicas_sync }}'}  # noqa 204
+        - {regexp: '^.*bind.*:{{ haproxy_listen_port.replicas_async }}$', line: '    bind {{ hostvars[inventory_hostname].inventory_hostname }}:{{ haproxy_listen_port.replicas_async }}'}  # noqa 204
+      loop_control:
+        label: "{{ item.line }}"
+      notify: "restart haproxy"
+
+  when: add_balancer is defined and add_balancer|bool
+
+...

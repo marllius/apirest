@@ -1,0 +1,79 @@
+---
+# yamllint disable rule:line-length
+#- block:
+
+#  - name: initialize empty list for devices
+#    set_fact:
+#      storage_devices: []
+#    no_log: true
+#
+#  - name: DISK | List of unmounted disks [SATA, NVMe or SCSI] devices
+#    set_fact:
+#      storage_devices: "{{ storage_devices + [item.key] }}"
+#    #no_log: true
+#    with_dict: "{{ ansible_devices }}"
+#    when: 
+#    - item.value.host.startswith('SATA controller:') or item.value.host.startswith('Non-Volatile memory controller:') or item.value.host.startswith('SCSI storage controller')
+#    - not item.value.partitions
+#    - not item.value.links.ids
+#    - not item.value.holders
+#
+#  - name: show SATA, NVMe or SCSI unmounted device
+#    debug: var=storage_devices[0].item
+#    #when: ansibel_debug == "true"
+#  
+#  - name: show all values for selected devices
+#    debug: msg="{{ ansible_devices[item] | list }}"
+#    loop: "{{ storage_devices }}"
+#  
+#  - name: show devices names
+#    debug: var=storage_devices
+#  
+#  - name: show first SATA or NVMe device in the list
+#    debug:
+#      #var: hostvars[inventory_hostname].ansible_devices.keys() | list
+#      var: storage_devices[0]
+#    #debug: var=storage_devices[0]
+
+#  - name: Get list of block devices
+#    command: 'lsblk'
+#    register: results
+#
+#  - name: Create variable block_devices
+#    set_fact:
+#      block_devices: "{{ results.stdout_lines }}"
+#  - debug:
+#      var: block_devices
+#
+#  - name: DISK | Create a new xfs primary partition for pgdata 
+#    community.general.parted:
+#      device: /dev/{{ storage_devices[0] }}
+#      number: 1
+#      state: present
+#      fs_type: xfs
+#      part_end: "100%"
+#      part_type: primary
+#      label: gpt
+#    loop:
+#      - "{{ storage_devices }}"
+#    when:
+#      - storage_devices is defined and storage_devices | length > 0
+#
+#  - name: DISK | Create directory to mount pgdata
+#    file:
+#      state: directory
+#      path: "{{ postgresql_data_dir | dirname | dirname }}"
+#      mode: 0700
+#
+#  - name: Mount pgdata diretory on disk [/dev/{{ storage_devices[0] }}]
+#    ansible.posix.mount:
+#      path: "{{ postgresql_data_dir | dirname | dirname }}"
+#      src: "/dev/{{ storage_devices[0] }}{{ partition_number }}"
+#      fstype: xfs
+#      opts: defaults
+#      state: present
+#    loop:
+#      - "{{ storage_devices }}"      
+
+
+...

@@ -1,0 +1,7 @@
+backend = "etcd"
+interval = 10
+watch = true
+nodes = [
+    "http://192.168.122.141:2379",
+    "http://192.168.122.85:2379",
+  ]

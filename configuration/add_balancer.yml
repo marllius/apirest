@@ -1,0 +1,38 @@
+---
+# yamllint disable rule:line-length
+
+- name: Add haproxy balancer node
+  hosts: balancers
+  become: true
+  become_method: sudo
+  any_errors_fatal: true
+  gather_facts: true
+  vars_files:
+    - vars/main.yml
+    - vars/system.yml
+  vars:
+    add_balancer: true
+
+  roles:
+    - role: common
+    - role: ansible-role-firewall
+      environment: "{{ proxy_env | default({}) }}"
+      vars:
+        firewall_allowed_tcp_ports: "{{ firewall_ports_dynamic_var|list | unique }}"
+        firewall_additional_rules: "{{ firewall_rules_dynamic_var|list | unique }}"
+      when: firewall_enabled_at_boot|bool
+
+    - role: hostname
+    - role: resolv_conf
+    - role: sysctl
+
+    - role: haproxy
+
+    - role: confd
+      when: dcs_type == "etcd" 
+
+    - role: keepalived
+      when: cluster_vip is defined and cluster_vip | length > 0 and
+
+
+...

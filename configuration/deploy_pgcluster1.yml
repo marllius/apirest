@@ -1,0 +1,120 @@
+---
+# yamllint disable rule:line-length
+
+- name: Deploy PostgreSQL HA Cluster (based on "Patroni" and "{{ dcs_type }}")
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - vars/main1.yml
+  vars:
+    minimal_ansible_version: 2.7.0
+  tasks:
+    - name: Checking ansible version
+      fail:
+        msg: "Ansible version must be {{ minimal_ansible_version }} or higher"
+      when: ansible_version.full is version(minimal_ansible_version, '<')
+
+- import_playbook: etcd_cluster.yml
+  when: not dcs_exists|bool and dcs_type == "etcd"
+
+- hosts: postgres_cluster
+  become: true
+  become_method: sudo
+  gather_facts: true
+  any_errors_fatal: true
+  vars_files:
+    - vars/main1.yml
+    - vars/system.yml
+
+  roles:
+    - role: common
+    - role: ansible-role-firewall
+      environment: "{{ proxy_env | default({}) }}"
+      vars:
+        firewall_allowed_tcp_ports: "{{ firewall_ports_dynamic_var|list | unique }}"
+        firewall_additional_rules: "{{ firewall_rules_dynamic_var|list | unique }}"
+      when: firewall_enabled_at_boot|bool
+
+    - role: hostname
+    - role: resolv_conf
+    - role: etc_hosts
+    - role: add-repository
+    - role: packages
+    - role: sudo
+    - role: sysctl
+    - role: locales
+    - role: timezone
+    - role: ssh-keys
+
+- import_playbook: balancers.yml
+
+- hosts: pgbackrest:postgres_cluster
+  become: true
+  become_method: sudo
+  gather_facts: true
+  any_errors_fatal: true
+  vars_files:
+    - vars/main1.yml
+
+  roles:
+    - role: pgbackrest
+      when: pgbackrest_install|bool
+
+- hosts: postgres_cluster
+  become: true
+  become_method: sudo
+  gather_facts: true
+  any_errors_fatal: true
+  vars_files:
+    - vars/main1.yml
+    - vars/system.yml
+
+  roles:
+    - role: pgbouncer
+      when: pgbouncer_install|bool
+
+    - role: patroni
+
+    - role: postgresql-users
+      when: is_master == "true" and postgresql_users | length > 0
+
+    - role: pgbouncer/authquery
+      when: is_master == "true" and pgbouncer_install|bool and pgbouncer_auth_query|bool
+
+    - role: postgresql-databases
+      when: is_master == "true" and postgresql_databases | length > 0
+
+    - role: postgresql-extensions
+      when: is_master == "true" and postgresql_extensions | length > 0
+
+    - role: pgbouncer/userlist
+      when: pgbouncer_install|bool
+
+
+- hosts: application
+  become: true
+  become_method: sudo
+  gather_facts: true
+  any_errors_fatal: true
+  vars_files:
+    - vars/main1.yml
+    - vars/system.yml
+
+  roles:
+    - role: application
+      when: deploy_app|bool
+
+- hosts: pgbackrest:postgres_cluster
+  become: true
+  become_method: sudo
+  gather_facts: true
+  any_errors_fatal: true
+  vars_files:
+    - vars/main1.yml
+    - vars/system.yml
+
+  roles:
+    # finish (info)
+    - role: deploy-finish
+
+...

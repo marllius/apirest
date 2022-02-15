@@ -1,0 +1,58 @@
+---
+
+- name: Install system packages
+  apt:
+    name: "{{ item }}"
+    state: latest
+  loop: "{{ system_packages }}"
+  environment: "{{ proxy_env | default({}) }}"
+
+# PostgreSQL prepare for install 
+- block:
+    - name: PostgreSQL | ensure postgresql home user is {{ postgresql_home_dir }}
+      user:
+        name: postgres
+        shell: /bin/bash
+        create_home: yes
+        home: "{{ postgresql_home_dir }}"
+
+    - name: PostgreSQL | ensure postgresql database-cluster manager package
+      package:
+        name: postgresql-common
+        state: present
+      environment: "{{ proxy_env | default({}) }}"
+
+    - name: PostgreSQL | disable initializing of a default postgresql cluster
+      replace:
+        path: /etc/postgresql-common/createcluster.conf
+        replace: create_main_cluster = false
+        regexp: ^#?create_main_cluster.*$
+
+    - name: PostgreSQL | disable log rotation with logrotate for postgresql
+      file:
+        dest: /etc/logrotate.d/postgresql-common
+        state: absent
+
+- block:
+    - name: Install PostgreSQL packages
+      apt:
+        name: "{{ item }}"
+        state: present
+      loop: "{{ postgresql_packages }}"
+      environment: "{{ proxy_env | default({}) }}"
+
+    - name: PostgreSQL | List postgresql binaries (psql,initdb,etc)
+      find:
+        paths: "{{ postgresql_bin_dir }}/"
+        file_type: file
+      register: postgresql_binaries
+
+    - name: PostgreSQL | Make sure postgresql binaries (psql,initdb,etc) is visible for all using symlink 
+      file:
+        src: "{{ item.path }}"
+        dest: /usr/sbin/{{ item.path | basename }}
+        state: link
+      with_items: "{{ postgresql_binaries.files }}"
+      no_log: true
+
+...

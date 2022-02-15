@@ -9,6 +9,10 @@ proxy_env: {}
 
 # -------------------------------------------
 
+#for deploy app
+app_directory: "/opt/app"
+
+
 # Repository
 apt_repository_keys:
   - key: "https://www.postgresql.org/media/keys/ACCC4CF8.asc"  # postgresql repository apt key

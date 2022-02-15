@@ -1,0 +1,219 @@
+#! /bin/bash
+
+
+
+# project config
+APP_NAME="Revolut"
+PROJECT_TEST_FOLDER="test"
+PROJECT_APP_MODULE_FILE="app.py"
+PROJECT_APP_VARIABLE="app"
+
+# vm config
+VM_PROJECT_PATH="/opt/app"
+VM_PY_PATH="/usr/bin/python3.9"
+DUMP_FILE="api_test.sql"
+
+# deployment config
+DEPLOYMENT_ENV="development"
+DEPLOYMENT_PORT="80"
+
+KILL_PORT=""
+
+MYIP=$(hostname -I | awk '{print $1}')
+
+echo $(date -u) "Strating deploy script" &>>/var/log/app/app.log
+
+function setup_venv() {
+    printf "***************************************************\n\t\tSetting up Venv \n***************************************************\n"
+    # Install virtualenv
+    echo 
+    echo ======= Installing virtualenv =======
+    sudo update-alternatives --install /usr/bin/python python /usr/bin/python3.9 1
+    
+    pip3 install virtualenv
+
+    # Create virtual environment and activate it
+    echo 
+    echo ======== Creating virtual env =======
+    cd $VM_PROJECT_PATH
+    python -m virtualenv -p $VM_PY_PATH $VM_PROJECT_PATH/venv
+
+    echo ======== Activating virtual env =======
+    source $VM_PROJECT_PATH/venv/bin/activate
+}
+
+function setup_dependencies() {
+    printf "***************************************************\n\t\tInstalling dependencies \n***************************************************\n"
+
+    requirements_file="$VM_PROJECT_PATH/requirements.txt"
+
+    if [ -f "$requirements_file" ]; then
+        echo 
+        echo ======= requirements.txt found ========
+        echo ======= Installing required packages ========
+        pip3 install -r $requirements_file
+    else
+        echo 
+        echo ======= No requirements.txt found ========
+        echo ======= Installing Flask and gunicorn with pip3 ========
+        pip3 install Flask flask-sqlalchemy marshmallow psycopg2-binary
+        pip3 install gunicorn
+    fi
+}
+
+# Create and Export required environment variable
+function setup_env() {
+    printf "***************************************************\n\t\tSetting up environment \n***************************************************\n"
+    
+    if [[ $1 == "test" ]]; then
+        echo 
+        echo ======= Exporting the environment variables from "$VM_PROJECT_PATH/.env.test" ========
+        sed -i  's/localhost/${MYIP}/g'  $VM_PROJECT_PATH/.env.test
+        export ENV_FILE_LOCATION=$VM_PROJECT_PATH/.env.test
+        source $VM_PROJECT_PATH/.env.test
+    elif [[ $1 == "deploy" ]]; then
+        echo 
+        echo ======= Exporting the environment variables from "$VM_PROJECT_PATH/.env" ========
+        export ENV_FILE_LOCATION=$VM_PROJECT_PATH/.env
+        source $VM_PROJECT_PATH/.env
+    else    
+        echo 
+        echo ====== Parameter $1 invalid ========
+    fi  
+}
+
+# Add a launch script
+function create_launch_script () {
+    printf "***************************************************\n\t\tCreating a Launch script \n***************************************************\n"
+
+    echo     
+    echo ====== Getting module name ========
+    module_name=${PROJECT_APP_MODULE_FILE%.*} 
+    module_name=${module_name##*/}
+    module_path="$VM_PROJECT_PATH/$module_name"
+
+    echo 
+    echo ====== Writing launch script ========
+    sudo cat > $VM_PROJECT_PATH/launch.sh <<EOF
+    #!/bin/bash
+    echo ====== Starting launch script ========
+    cd $VM_PROJECT_PATH
+
+    echo ====== Processing environment variables ========
+    source $VM_PROJECT_PATH/.env
+
+    echo ====== Activating virtual environment ========
+    export ENV_FILE_LOCATION=$VM_PROJECT_PATH/.env
+    source $VM_PROJECT_PATH/venv/bin/activate
+
+    echo ====== Deploying build $DEPLOYMENT_ENV of $APP_NAME on port $DEPLOYMENT_PORT ========
+    gunicorn -b 0.0.0.0:$DEPLOYMENT_PORT --daemon ${module_name}:$PROJECT_APP_VARIABLE
+    printf "\n\n\n\n"
+    echo ====== PROBLEMS? ========
+    echo ====== RUN \"gunicorn -b 0.0.0.0:$DEPLOYMENT_PORT ${module_path}:$PROJECT_APP_VARIABLE\" FOR MORE LOGS ========
+    printf "***************************************************\n\t\tDeployment Completed. \n***************************************************\n"
+EOF
+
+    echo ====== Giving user rights to execute launch script ========
+    sudo chmod 755 $VM_PROJECT_PATH/launch.sh
+    
+    echo ====== Listing all file metadata about launch script =======
+    ls -la $VM_PROJECT_PATH/launch.sh
+}
+
+# Serve the web app through gunicorn
+function launch_app() {
+    sudo bash $VM_PROJECT_PATH/launch.sh
+}
+
+# Run tests
+function setup_docker() {
+    printf "***************************************************\n\t\tSetup PostgreSQL docker \n***************************************************\n"
+
+    test_folder="$VM_PROJECT_PATH/$PROJECT_TEST_FOLDER"
+
+    if [[ $1 == "up" ]]; then
+        if [[ -d $test_folder ]]; then
+            echo 
+            echo ====== stop previously postgresql docker ========
+            sudo docker stop postgres
+            sudo docker rm postgres
+            echo 
+            echo ====== start postgresql docker ========
+            sudo docker-compose up -d
+        else
+            echo 
+            echo ====== No "test" folder found ========
+        fi
+    elif [[ $1 == "down" ]]; then
+        echo 
+        echo ====== removing postgresql docker ========
+        sudo docker stop $(sudo docker ps -aq)
+        sudo docker rm $(sudo docker ps -aq)
+        sudo docker rmi postgres:13
+        rm -rf /tmp/pgdata
+    else
+        echo 
+        echo ====== Parameter $1 invalid ========
+    fi   
+
+}
+
+function run_tests() {
+    printf "***************************************************\n\t\tRunning tests \n***************************************************\n"
+
+    if [[ -d $test_folder ]]; then
+        echo 
+        echo ====== Installing nose ========
+        pip install nose
+        cd $test_folder
+        echo 
+        echo ====== Starting unit tests ========
+        nosetests test*
+    else
+        echo 
+        echo ====== No "test" folder found ========
+    fi   
+}
+
+function check_last_step() {
+    if [ $1 -ne 0 ]; then
+        printf "\n***************************************************\n\t\tDeployment Failed. \n***************************************************\n"
+        printf "Exiting early because the previous step has failed.\n"
+        printf "For more information read /var/log/app/app.log.\n"
+        printf "***************************************************\n\t\tDeployment Failed. \n***************************************************\n"
+        exit 2
+    fi
+}
+
+#setup_venv &>>/var/log/app/app.log
+setup_venv 
+check_last_step $?
+
+#setup_dependencies &>>/var/log/app/app.log
+setup_dependencies 
+check_last_step $?
+
+#setup_env &>>/var/log/app/app.log
+setup_env "test"
+check_last_step $?
+
+setup_docker "up"
+check_last_step $?
+
+#run_tests &>>/var/log/app/app.log
+run_tests 
+check_last_step $?
+
+setup_docker "down"
+check_last_step $?
+
+setup_env "deploy"
+check_last_step $?
+
+#create_launch_script &>>/var/log/app/app.log
+create_launch_script 
+check_last_step $?
+
+#launch_app &>>/var/log/app/app.log
+launch_app 

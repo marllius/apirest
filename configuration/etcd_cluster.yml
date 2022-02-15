@@ -14,7 +14,6 @@
     - name: Update apt cache
       apt:
         update_cache: true
-        cache_valid_time: 3600
       environment: "{{ proxy_env | default({}) }}"
 
     - name: Make sure the gnupg and apt-transport-https packages are present

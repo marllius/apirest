@@ -5,39 +5,6 @@
   meta: flush_handlers
 
 - block:
-    - name: Create a stanza cluster
-      run_once: true
-      become: true
-      command: sudo -u pgbackrest pgbackrest --stanza={{ pgbackrest_stanza }} stanza-create
-      environment:
-        PATH: "{{ ansible_env.PATH }}:/usr/bin:/usr/local/bin"
-      changed_when: false
-
-    - name: Generate 1 full backup using pgbackrest
-      run_once: true
-      become: true
-      command: sudo -u pgbackrest pgbackrest --stanza={{ pgbackrest_stanza }} backup
-      environment:
-        PATH: "{{ ansible_env.PATH }}:/usr/bin:/usr/local/bin"
-      changed_when: false
-
-    - name: Check postgresql cluster backup info
-      run_once: true
-      become: true
-      command: sudo -u pgbackrest pgbackrest --stanza={{ pgbackrest_stanza }} info --log-level-console info
-      register: bkp_info_result
-      environment:
-        PATH: "{{ ansible_env.PATH }}:/usr/bin:/usr/local/bin"
-      changed_when: false
-
-    - name: PostgreSQL Cluster backup info
-      run_once: true
-      debug:
-        var: bkp_info_result.stdout_lines
-  ignore_errors: true
-  when: "'pgbackrest' in group_names"
-
-- block:
     - name: Check postgresql cluster health
       run_once: true
       become: true
@@ -117,15 +84,20 @@
           - +------------------------------------------------+
       when: not synchronous_mode|bool
 
-- block:
-  - name: Application nodes 
-    run_once: true
-    debug:
-      msg:
-        - +------------------------------------------------+
-        - Application nodes
-        - address {{ application_nodes }}
-        - port {{ haproxy_listen_port.master }} (read/write) master
-        - port {{ haproxy_listen_port.replicas }} (read only)  all replicas
-        - +------------------------------------------------+
+    - name: Create list of application nodes
+      run_once: true
+      set_fact:
+        application_nodes: "{% for host in groups['application'] %}{{ hostvars[host]['inventory_hostname'] }}{% if not loop.last %},{% endif %}{% endfor %}"  # noqa 204
+        
+    - name: Application nodes 
+      run_once: true
+      debug:
+        msg:
+          - +------------------------------------------------+
+          - Application nodes
+          - address {{ application_nodes }}
+          - port {{ haproxy_listen_port.master }} (read/write) master
+          - port {{ haproxy_listen_port.replicas }} (read only)  all replicas
+          - +------------------------------------------------+
+  
 ...

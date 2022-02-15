@@ -5,10 +5,10 @@
 # pip install
 - import_tasks: pip.yml
 
-#- name: Add python Repository
-#  apt_repository:
-#    repo: "ppa:deadsnakes/ppa"
-#    state: present
+- name: Add python Repository
+  apt_repository:
+    repo: "ppa:deadsnakes/ppa"
+    state: present
 
 - name: Install aptitude using apt
   apt: 
@@ -16,20 +16,6 @@
     state: latest
     update_cache: yes 
     force_apt_get: yes
-
-- name: Install required system packages
-  apt: 
-    name: "{{ item }}"
-    state: latest
-    update_cache: yes
-  loop: [ 'apt-transport-https', 'ca-certificates', 'curl', 'software-properties-common', 'python3.9']
-
-- name: Install required system packages
-  apt: 
-    name: "{{ item }}"
-    state: latest
-    update_cache: yes
-  loop: ['python3-pip', 'virtualenv', 'python3-setuptools', 'git', 'nginx', 'wget']
 
 - name: Add Docker GPG apt Key
   apt_key:
@@ -41,30 +27,23 @@
     repo: deb https://download.docker.com/linux/ubuntu bionic stable
     state: present
 
-- name: Update apt and install docker-ce
+- name: Install required system packages
+  become: true
+  become_user: root
   apt: 
-    update_cache: yes
-    name: docker-ce
+    name: "{{ item }}"
     state: latest
+    update_cache: yes
+  loop: [ 'apt-transport-https', 'ca-certificates', 'curl', 'software-properties-common', 'python3.9','python3-pip', 'virtualenv', 'python3-setuptools', 'git', 'wget', 'docker-ce', 'docker-compose', 'net-tools']
   
 - name: Install Docker Module for Python
   pip:
     name: docker
-
-- name: Copy restapi requirements.txt file
-  copy:
-    src: requirements.txt
-    dest: /tmp/requirements.txt
-
-- name: Copy deploy script deploy.sh 
-  copy:
-    src: deploy.sh
-    dest: /tmp/deploy.sh
-    owner: ubuntu
-    group: ubuntu
-    mode: 740
+    executable: pip3
 
 - name: Install setuptools
+  become: true
+  become_user: root
   pip:
     name: setuptools
     state: latest
@@ -74,47 +53,61 @@
   environment:
     PATH: "{{ ansible_env.PATH }}:/usr/local/bin:/usr/bin"
 
-- name: Install requirements
-  pip:
-    requirements: /tmp/requirements.txt
-    executable: pip3
-    extra_args: "--trusted-host=pypi.python.org --trusted-host=pypi.org --trusted-host=files.pythonhosted.org"
-    umask: "0022"
-  environment:
-    PATH: "{{ ansible_env.PATH }}:{{ postgresql_bin_dir }}:/usr/local/bin:/usr/bin"
+- name: Copy restapi files
+  become: true
+  become_user: root
+  copy:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    mode: "{{ item.mode }}"
+  loop:
+  - {src: "deploy.sh", dest: "/tmp/deploy.sh", mode: "777"}
 
-- name: Create log file on directory /var/log/app/
+
+- name: Create directories for log and application
+  become: true
+  become_user: root
   file:
-    path: "/var/log/app"
-    owner: ubuntu
-    group: ubuntu
-    state: directory
-    mode: 0740
+    path: "{{ item.path }}"
 
-- name: Copy .env file into /tmp.
+    state: directory
+    mode: "{{ item.mode }}"
+  loop:
+  - { path: "/var/log/app", mode: "0740" }
+  - { path: "{{ app_directory }}", mode: "0740" }
+
+- name: Copy restapi aplication to /pot/api
+  become: true
+  become_user: root
+  copy:
+    src: ../../../../app/
+    dest: "{{ app_directory }}"
+    mode: 664
+
+- name: Copy .env file into {{ app_directory }}.
+  become: true
+  become_user: root
   template:
     src: env.j2
-    dest: /tmp/.env
-    owner: root
-    group: root
-    mode: 0755
+    dest: "{{ app_directory }}/.env"
+    mode: 0740
 
-# run command
+- name: Copy docker-compose file into {{ app_directory }}.
+  become: true
+  become_user: root
+  template:
+    src: docker-compose.j2
+    dest: "{{ app_directory }}/docker-compose.yml"
+    mode: 0740    
 
-- name: Configure default pyhton
-  command: "sudo update-alternatives --install /usr/bin/python python /usr/bin/python3.9" 
-  register: python_result
-  changed_when: false
-  failed_when:
-    - python_result.rc != 0
-
+# run scipt deploy
 - name: run scrip to deploy app
-  command: "sudo bash /tmp/deploy.sh -c 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 -s apirestfull -p 80 marllius Revolut &>>/var/log/app/app.log" 
+  become: true
+  become_user: root
+  command: "sudo bash /tmp/deploy.sh &>>/var/log/app/app.log" 
   register: deploy_result
   changed_when: false
   failed_when:
     - deploy_result.rc != 0
-
-            
 
 ...

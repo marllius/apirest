@@ -38,6 +38,6 @@
 
   roles:
     # finish (info)
-    - role: deploy-finish
+    - role: deploy-finish/application
 
 ...

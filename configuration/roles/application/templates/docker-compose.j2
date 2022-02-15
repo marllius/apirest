@@ -1,0 +1,12 @@
+version: '3.4'
+
+services:
+  postgres:
+    image: postgres:13-alpine
+    volumes:
+      - {{ app_directory }}/test/api_test.sql:/docker-entrypoint-initdb.d/test_api.sql
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    ports:
+      - 5432:5432

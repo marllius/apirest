@@ -138,6 +138,7 @@ postgresql_extensions:
 #  - {ext: "", db: ""}
 #  - {ext: "", db: ""}
 
+app_directory: "/opt/app"
 
 # postgresql parameters to bootstrap dcs (are parameters for example)
 postgresql_parameters:

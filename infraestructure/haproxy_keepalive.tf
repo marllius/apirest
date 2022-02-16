@@ -7,8 +7,8 @@ locals {
       root_block_device = [
         {
           device_name = var.device_name
-          volume_type = "gp2"
-          volume_size = 8
+          volume_type = var.volume_type
+          volume_size = var.balancer_volume_size
           encrypted   = true
           tags = {
             block_device = "root-block"
@@ -30,8 +30,8 @@ locals {
       root_block_device = [
         {
           device_name = var.device_name
-          volume_type = "gp2"
-          volume_size = 8
+          volume_type = var.volume_type
+          volume_size = var.balancer_volume_size
           encrypted   = true
           tags = {
             block_device = "root-block"
@@ -53,8 +53,8 @@ locals {
       root_block_device = [
         {
           device_name = var.device_name
-          volume_type = "gp2"
-          volume_size = 8
+          volume_type = var.volume_type
+          volume_size = var.balancer_volume_size
           encrypted   = true
           tags = {
             block_device = "root-block"

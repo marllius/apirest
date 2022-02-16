@@ -6,7 +6,7 @@ module "db_security_group" {
   description = "Security group for PostgreSQL EC2 instance"
   vpc_id      = module.vpc.vpc_id
 
-  ingress_cidr_blocks = ["0.0.0.0/0"]
+  ingress_cidr_blocks = [var.cidr]
   ingress_rules       = ["http-80-tcp", "postgresql-tcp"]
   ingress_with_cidr_blocks = [
     {
@@ -14,17 +14,17 @@ module "db_security_group" {
       to_port     = 8008
       protocol    = "tcp"
       description = "patroni"
-      cidr_blocks = "10.30.0.0/16"
+      cidr_blocks = var.cidr
     },
     {
       from_port   = 22
       to_port     = 22
       protocol    = "tcp"
       description = "ssh"
-      cidr_blocks = "0.0.0.0/0"
-    },    
+      cidr_blocks = "0.0.0.0/0" #var.cidr
+    },
   ]
-  egress_rules        = ["all-all"]
+  egress_rules = ["all-all"]
 
 }
 
@@ -33,7 +33,7 @@ module "app_security_group" {
   version = "~> 4.0"
 
   name        = "app-sg"
-  #description = "default securty group for app"
+  description = "default securty group for app"
   vpc_id      = module.vpc.vpc_id
 
   ingress_with_cidr_blocks = [
@@ -49,10 +49,10 @@ module "app_security_group" {
       to_port     = 22
       protocol    = "tcp"
       description = "ssh"
-      cidr_blocks = "0.0.0.0/0"
-    },    
+      cidr_blocks = "0.0.0.0/0" #var.cidr
+    },
   ]
-  egress_rules        = ["all-all"]
+  egress_rules = ["all-all"]
 
 }
 
@@ -61,7 +61,7 @@ module "app_security_group" {
   version = "~> 4.0"
 
   name        = "etcd-sg"
-  #description = "default securtiy group for etc"
+  description = "default securtiy group for etcd"
   vpc_id      = module.vpc.vpc_id
 
   ingress_with_cidr_blocks = [
@@ -70,23 +70,23 @@ module "app_security_group" {
       to_port     = 2379
       protocol    = "tcp"
       description = "etcd-1"
-      cidr_blocks = "10.30.0.0/16"
+      cidr_blocks = var.cidr
     },
     {
       from_port   = 2380
       to_port     = 2380
       protocol    = "tcp"
       description = "etcd-2"
-      cidr_blocks = "10.30.0.0/16"
-    },    
+      cidr_blocks = var.cidr
+    },
     {
       from_port   = 22
       to_port     = 22
       protocol    = "tcp"
       description = "ssh"
-      cidr_blocks = "10.30.0.0/16"
-    },    
+      cidr_blocks = var.cidr
+    },
   ]
-  egress_rules        = ["all-all"]
+  egress_rules = ["all-all"]
 
 }

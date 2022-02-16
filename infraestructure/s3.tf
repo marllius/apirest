@@ -1,9 +1,3 @@
-locals {
-  bucket_name             = "pgbackup-origin-${random_pet.this.id}"
-  destination_bucket_name = "pgbackup-replication-${random_pet.this.id}"
-}
-
-data "aws_caller_identity" "current" {}
 
 resource "random_pet" "this" {
   length = 2

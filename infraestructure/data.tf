@@ -16,10 +16,8 @@ data "aws_ami" "ubuntu" {
 
 #if you want to use an existed kms keys 
 
-data "aws_kms_key" "ec2" {
-  key_id = "alias/aws/ec2"
+data "aws_kms_key" "deploy" {
+  key_id = var.data_aws_kms_key
 }
 
-data "aws_kms_key" "s3" {
-  key_id = "alias/aws/ec2"
-}
+data "aws_caller_identity" "current" {}

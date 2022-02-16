@@ -209,7 +209,6 @@ postgresql_parameters:
 
 # specify additional hosts that will be added to the pg_hba.conf
 postgresql_pg_hba:
-  #- {type: "local", database: "all", user: "postgres", address: "", method: "trust"}  # "local=trust" required for ansible modules "postgresql_(user,db,ext)"
   - {type: "local", database: "all", user: "postgres", address: "", method: "trust"}  # "local=trust" required for ansible modules "postgresql_(user,db,ext)"
   - {type: "local", database: "all", user: "all", address: "", method: "peer"}
   - {type: "host", database: "all", user: "all", address: "127.0.0.1/32", method: "{{ postgresql_password_encryption_algorithm }}"}
@@ -351,14 +350,14 @@ basebackup:
 
 
 # "restore_command" written to recovery.conf when configuring follower (create replica)
-postgresql_restore_command: ""
-#postgresql_restore_command: "pgbackrest --stanza={{ pgbackrest_stanza }} archive-get %f %p"  # restore WAL-s using pgbackrest
+#postgresql_restore_command: ""
+postgresql_restore_command: "pgbackrest --stanza={{ pgbackrest_stanza }} archive-get %f %p"  # restore WAL-s using pgbackrest
 
 # pgBackRest
 pgbackrest_install: true  # 'false' or 'true'
 pgbackrest_install_from_pgdg_repo: true  # or 'false'
 pgbackrest_stanza: "postgresql-cluster"  # specify your --stanza
-pgbackrest_repo_type: "posix"  # or "s3"
+pgbackrest_repo_type: "s3"  # or "s3"
 pgbackrest_repo_host: "192.168.122.6"  # dedicated repository host (if repo_type: "posix")
 #pgbackrest_repo_host: "192.168.122.195"
 pgbackrest_repo_user: "pgbackrest"  # if "repo_host" is set

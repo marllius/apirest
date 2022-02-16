@@ -2,18 +2,18 @@ module "vpc" {
   source  = "terraform-aws-modules/vpc/aws"
   version = "~> 3.0"
 
-  name = "hometask-vpc"
-  cidr = "10.30.0.0/16"
+  name = var.vpc_name
+  cidr = var.cidr
 
   azs              = ["${var.region}a", "${var.region}b", "${var.region}c"]
-  private_subnets  = ["10.30.1.0/24", "10.30.2.0/24", "10.30.3.0/24"]
-  public_subnets   = ["10.30.101.0/24", "10.30.102.0/24", "10.30.103.0/24"]
-  database_subnets = ["10.30.201.0/24", "10.30.202.0/24", "10.30.203.0/24"]
+  private_subnets  = [var.private_subnets]
+  public_subnets   = [var.public_subnets]
+  database_subnets = [var.database_subnets]
 
-  enable_nat_gateway = true
-  enable_vpn_gateway = false
-  map_public_ip_on_launch = true
-  enable_dns_hostnames = true
-  enable_dns_support   = true
+  enable_nat_gateway      = var.enable_nat_gateway
+  enable_vpn_gateway      = var.enable_vpn_gateway
+  map_public_ip_on_launch = var.map_public_ip_on_launch
+  enable_dns_hostnames    = var.enable_dns_hostnames
+  enable_dns_support      = var.enable_dns_support
 
 }

@@ -9,24 +9,11 @@ locals {
       root_block_device = [
         {
           device_name = var.device_name
-          volume_type = "gp2"
-          volume_size = 8
+          volume_type = var.volume_type
+          volume_size = var.db_volume_size
           encrypted   = true
           tags = {
             block_device = "root-block"
-            instance     = "pg-node1"
-          }
-        }
-      ]
-      ebs_block_device = [
-        {
-          device_name = "/dev/sdb"
-          volume_type = "gp2"
-          volume_size = 8
-          encrypted   = true
-          kms_key_id  = data.aws_kms_key.ec2.id
-          tags = {
-            block_device = "pgdata"
             instance     = "pg-node1"
           }
         }
@@ -45,24 +32,11 @@ locals {
       root_block_device = [
         {
           device_name = var.device_name
-          volume_type = "gp2"
-          volume_size = 8
+          volume_type = var.volume_type
+          volume_size = var.db_volume_size
           encrypted   = true
           tags = {
             block_device = "root-block"
-            instance     = "pg-node2"
-          }
-        }
-      ]
-      ebs_block_device = [
-        {
-          device_name = "/dev/sdb"
-          volume_type = "gp2"
-          volume_size = 8
-          encrypted   = true
-          kms_key_id  = data.aws_kms_key.ec2.id
-          tags = {
-            block_device = "pgdata"
             instance     = "pg-node2"
           }
         }
@@ -81,24 +55,11 @@ locals {
       root_block_device = [
         {
           device_name = var.device_name
-          volume_type = "gp2"
-          volume_size = 8
+          volume_type = var.volume_type
+          volume_size = var.volume_size
           encrypted   = true
           tags = {
             block_device = "root-block"
-            instance     = "pg-node3"
-          }
-        }
-      ]
-      ebs_block_device = [
-        {
-          device_name = "/dev/sdb"
-          volume_type = "gp2"
-          volume_size = 8
-          encrypted   = true
-          kms_key_id  = data.aws_kms_key.ec2.id
-          tags = {
-            block_device = "pgdata"
             instance     = "pg-node3"
           }
         }

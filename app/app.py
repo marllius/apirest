@@ -10,9 +10,6 @@ from sqlalchemy import text
 
 app=Flask(__name__)
 app.config.from_envvar('ENV_FILE_LOCATION')
-#app.config["SQLALCHEMY_DATABASE_URI"]='postgresql://api_app:api#123@192.168.122.194:5000/api'
-#SQLALCHEMY_DATABASE_URI='postgresql://postgres:postgres@localhost:5432/api'
-#app.config["SQLALCHEMY_TRACK_MODIFICATIONS"]=False
 
 db=SQLAlchemy(app)
 
@@ -65,21 +62,21 @@ def hello(username):
     elif request.method == 'PUT':
         data=request.get_json()
 
-        if not request.json or not 'birthday' in request.json:
+        if not request.json or not 'dateOfBirth' in request.json:
             abort(401)
         else:
             try:
-                datetime_of_birth = datetime.datetime.strptime(data['birthday'], '%Y-%m-%d')
+                datetime_of_birth = datetime.datetime.strptime(data['dateOfBirth'], '%Y-%m-%d')
                 birthday = datetime_of_birth.date()
             except ValueError as e:
-                return jsonify(message=f"{data['birthday']} must be a valid YYYY-MM-DD date."),400
+                return jsonify(message=f"{data['dateOfBirth']} must be a valid YYYY-MM-DD date."),400
 
             if datetime.date.today() <= birthday :
-                return jsonify(message=f"{data['birthday']} must be a date before the today date."),400
+                return jsonify(message=f"{data['dateOfBirth']} must be a date before the today date."),400
 
-        #try to insert if conflit username update de value
+        #try to insert on conflict update it
         insert_statement = text("INSERT INTO users (username,birthday) VALUES (:username, :birthday) ON CONFLICT (username) DO UPDATE SET birthday = EXCLUDED.birthday")
-        params = [{"username":username, "birthday":data.get('birthday')}]
+        params = [{"username":username, "birthday":data.get('dateOfBirth')}]
         
         
         db.session.execute(insert_statement, params)
@@ -93,7 +90,7 @@ def not_found(error):
 
 @app.errorhandler(401)
 def not_found(error):
-    return jsonify({"message":"You need to pass a json context or 'birthday' key is not present on it"}),401
+    return jsonify({"message":"You need to pass a json context or 'dateOfBirth' key is not present on it"}),401
 
 @app.errorhandler(500)
 def internal_server(error):

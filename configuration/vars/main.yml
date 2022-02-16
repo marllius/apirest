@@ -379,6 +379,9 @@ pgbackrest_conf:
     - {option: "repo1-type", value: "{{ pgbackrest_repo_type |lower }}"}
     - {option: "repo1-host", value: "{{ pgbackrest_repo_host }}"}
     - {option: "repo1-host-user", value: "{{ pgbackrest_repo_user }}"}
+    - {option: "repo1-retention-full", value: "{{ pgbackrest_retention_full_bkp }}"}
+    - {option: "repo1-retention-full-type", value: "{{ pgbackrest_retention_full_type }}"}
+    - {option: "start-fast", value: "{{ pgbackrest_start_fast }}"}        
 #    - {option: "", value: ""}
   stanza:  # [stanza_name] section
     - {option: "pg1-path", value: "{{ postgresql_data_dir }}"}
@@ -398,6 +401,9 @@ pgbackrest_conf_host:
   stanza:  # [stanza_name] section
     - {option: "pg1-path", value: "{{ postgresql_data_dir }}"}   
     - {option: "pg1-host", value: "{{ postgresql_master }}"}
+    - {option: "process-max", value: "2"}
+    - {option: "compress-level", value: "{{ pgbackrest_compress_level }}"}
+
 #    - {option: "", value: ""}
 
 

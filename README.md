@@ -13,16 +13,66 @@
 In this configuration, you will deploy at least 13 hosts, 1 host of each type in 1 different Availability Zone:
 
 - 3 pg nodes 
-- 3 etcd nodes
+- 3 etcd nodes 
 - 3 HAProxy nodes
 - 3 applications nodes
 - 1 pgbackrest repository
 - 2 Simple Storage Service (S3 buckets) with cross region replication for DR
 
+> **For testing proprose, you can use simples structure: pgnodes + etcd on the same server, using minimum 2 node. :warning: Using this configuration remember to add the secerity groups rules for this 3 on the same security :warning:**
+
+# Problem specification for app
+
+<details>
+  <summary>Click for details</summary>
+
+<br>
+
+### 1. Design and code a simple "Hello World" application that exposes the following HTTP-based APIs:
+
+<br>
+
+#### Description: Saves/updates the given user’s name and date of birth in the database.
+
+```json
+Request: PUT /hello/<username> { “dateOfBirth”: “YYYY-MM-DD” }
+Response: 204 No Content
+```
+
+> Note:<br>
+> `<username>` must contain only letters.<br>
+> `YYYY-MM-DD` must be a date before the today date.
+
+<br>
+
+#### Description:  Returns hello birthday message for the given user
+```json
+Request: Get /hello/<username>
+Response: 200 OK
+```
+
+Response Examples:
+
+A. If username’s birthday is in N days:
+```json
+{ “message”: “Hello, <username>! Your birthday is in N day(s)”}
+```
+
+B. If username’s birthday is today:
+```json
+{ “message”: “Hello, <username>! Happy birthday!” }
+```
+
+</details>
+
 # How to use this repository
 
-### Configuring on AWS arquiteture
+## Configuring on AWS arquiteture with terraform
 
+
+<details>
+  <summary>Click for details</summary>
+  
 - Under subdirectory infrastructure you will found the following directories:
 
 ```
@@ -76,16 +126,23 @@ terraform init
 terraform plan
 terraform apply
 ```
----
+</details>
 
+
+---
 ## After launching the instances, you will need to configure and install the tools. For that you must run ansible.
+
 ---
 ### **Note: You can use ansible on your local machines if you want.**
+
+## Configuring hosts with ansible
+
+<details>
+  <summary>details</summary>
+
 > Ansible [installation guide](https://docs.ansible.com/ansible/latest/installation_guide/index.html)
-
-
+ 
 ## Usage
-
 - on directory configuration you will found the following files:
 
 ```bash
@@ -134,8 +191,14 @@ Specify the ip addresses and connection settings (ansible_user, ansible_ssh_pass
 
 - Configure only the databases servers in HA 
 
+- deploy everything
+
 ```console
-ansible-playbook -i inventory/environment.yml deploy_cluster.yml
+ansible-playbook -i inventory/environment.yml deploy_all.yml
+```
+
+```console
+ansible-playbook -i inventory/environment.yml deploy_clusters.yml
 ```
 
 - Configure only the app servers
@@ -151,7 +214,7 @@ Using de aplication:
 
  - Insert or update a registry
 ```bash
-curl -X PUT -H 'Content-Type: application/json' -d '{"birthday":"1988-04-12"}' http://<host_ip>/hello/lola
+curl -X PUT -H 'Content-Type: application/json' -d '{"dateOfBirth":"1988-04-12"}' http://<host_ip>/hello/lola
 ```
 
 - Get information about birthday
@@ -174,11 +237,165 @@ psql -h <cluster_vip> -U dba postgres -p 5001
 
 - To check cluster health, we can enter HAProxy status page
 
-
 ```
 https://<HAProxy_ip>:7000
 ```
 **_NOTE: the user postgres is only acessible inside the host._**
 
 - all ips and ports information to access the database or application are available in the playbook output executed by ansible.
+
+# Backup and Restore from s3
+
+## pgBackRest 
+:calendar: :watch: 
+
+```bash
+#change the variable:
+
+pgbackrest_repo_type: "s3"
+
+#add this lines on:
+
+pgbackrest_conf:
+  global:  
+    - {option: "repo1-path", value: "{{ pgbackrest_repo_host }}"}
+    - {option: "repo1-s3-endpoint", value: "s3endpoint"}
+    - {option: "repo1-s3-bucket", value: "pgpgbackup-origin-"}
+    - {option: "repo1-s3-verify-tls", value: "n"}
+    - {option: "repo1-s3-key", value: "accessKey"}
+    - {option: "repo1-s3-key-secret", value: "superSECRETkey"}
+    - {option: "repo1-s3-region", value: "eu-east-1"}
+    - {option: "delta", value: "y"}
+
+pgbackrest_conf_host:
+  global:
+    - {option: "repo1-path", value: "{{ pgbackrest_bkp_dir }}"}
+    - {option: "repo1-retention-full", value: "{{ pgbackrest_retention_full_bkp }}"}
+    - {option: "repo1-retention-full-type", value: "{{ pgbackrest_retention_full_type }}"}
+    - {option: "repo1-type", value: "{{ pgbackrest_repo_type |lower }}"}    
+    - {option: "start-fast", value: "{{ pgbackrest_start_fast }}"}
+
+```
+
+- `vars/system.yml`
+
+```bash
+etc_hosts:
+  - "192.168.122.157 pgbackrest.local s3endpoint"
+```
+## Backup command
+
+-on postgres node:
+```bash
+sudo -u postgres pgbackrest --stanza=postgresql_cluster --log-level-console info backup
+```
+
+-on pgbackrest node:
+```bash
+sudo -u pgbackrest pgbackrest --stanza=postgresql_cluster --log-level-console info backup
+```
+
+## Restore command
+
+-on postgres node:
+```bash
+#stop the cluster on this node
+sudo systemctl stop patroni.service
+```
+> :bomb: if you run this command on master node, the failover will be execute 
+
+retoring 1 database
+```bash
+postgres pgbackrest --stanza=postgresql_cluster --delta \
+       --db-include=api --type=immediate --target-action=promote restore
+```
+
+retoring 1 database
+```bash
+postgres pgbackrest --stanza=postgresql_cluster --delta \
+       --db-include=api --type=immediate --target-action=promote restore
+```
+
+for more information: https://pgbackrest.org/user-guide.html#quickstart/create-repository
+
+</details>
+
+---
+
+# Administration tools
+
+## patroniclt commands
+
+<details>
+  <summary>details</summary>
+
+```bash
+Usage: patronictl [OPTIONS] COMMAND [ARGS]...
+
+Options:
+  -c, --config-file TEXT  Configuration file
+  -d, --dcs TEXT          Use this DCS
+  -k, --insecure          Allow connections to SSL sites without certs
+  --help                  Show this message and exit.
+
+Commands:
+  configure    Create configuration file
+  dsn          Generate a dsn for the provided member, defaults to a dsn of...
+  edit-config  Edit cluster configuration
+  failover     Failover to a replica
+  flush        Discard scheduled events
+  history      Show the history of failovers/switchovers
+  list         List the Patroni members for a given Patroni
+  pause        Disable auto failover
+  query        Query a Patroni PostgreSQL member
+  reinit       Reinitialize cluster member
+  reload       Reload cluster member configuration
+  remove       Remove cluster from DCS
+  restart      Restart cluster member
+  resume       Resume auto failover
+  scaffold     Create a structure for the cluster in DCS
+  show-config  Show cluster configuration
+  switchover   Switchover to a replica
+  topology     Prints ASCII topology for given cluster
+  version      Output version of patronictl command or a running Patroni...
+```
+
+</details>
+
+
+## pgbackrest commands
+
+<details>
+  <summary>details</summary>
+
+```bash
+Usage:
+    pgbackrest [options] [command]
+
+Commands:
+    archive-get     Get a WAL segment from the archive.
+    archive-push    Push a WAL segment to the archive.
+    backup          Backup a database cluster.
+    check           Check the configuration.
+    expire          Expire backups that exceed retention.
+    help            Get help.
+    info            Retrieve information about backups.
+    repo-get        Get a file from a repository.
+    repo-ls         List files in a repository.
+    restore         Restore a database cluster.
+    server          pgBackRest server.
+    server-ping     Ping pgBackRest server.
+    stanza-create   Create the required stanza data.
+    stanza-delete   Delete a stanza.
+    stanza-upgrade  Upgrade a stanza.
+    start           Allow pgBackRest processes to run.
+    stop            Stop pgBackRest processes from running.
+    version         Get version.
+
+Use 'pgbackrest help [command]' for more information.
+
+```
+
+</details>
+
 

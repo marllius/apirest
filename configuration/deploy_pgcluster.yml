@@ -91,19 +91,6 @@
       when: pgbouncer_install|bool
 
 
-- hosts: application
-  become: true
-  become_method: sudo
-  gather_facts: true
-  any_errors_fatal: true
-  vars_files:
-    - vars/main1.yml
-    - vars/system.yml
-
-  roles:
-    - role: application
-      when: deploy_app|bool
-
 - hosts: pgbackrest:postgres_cluster
   become: true
   become_method: sudo

@@ -9,6 +9,10 @@ proxy_env: {}
 
 # -------------------------------------------
 
+#for deploy app
+app_directory: "/opt/app"
+
+
 # Repository
 apt_repository_keys:
   - key: "https://www.postgresql.org/media/keys/ACCC4CF8.asc"  # postgresql repository apt key
@@ -121,7 +125,7 @@ postgresql_users:
 # (optional) list of databases to be created (if not already exists)
 #postgresql_databases: []
 postgresql_databases: 
-  - {db: "api", encoding: "UTF8", lc_collate: "en_US.UTF-8", lc_ctype: "en_US.UTF-8", owner: "api_app", state: "present", target_file: "/tmp/api.sql"}  #for apirestfull
+  - {db: "api", encoding: "UTF8", lc_collate: "en_US.UTF-8", lc_ctype: "en_US.UTF-8", owner: "api_app", state: "restore", target_file: "/tmp/api.sql"}  #for apirestfull
   - {db: "postgres", encoding: "UTF8", lc_collate: "en_US.UTF-8", lc_ctype: "en_US.UTF-8", owner: "postgres", state: "present", target_file: ""}
 #  - {db: "", encoding: "UTF8", lc_collate: "en_US.UTF-8", lc_ctype: "en_US.UTF-8", owner: ""}
 
@@ -138,7 +142,6 @@ postgresql_extensions:
 #  - {ext: "", db: ""}
 #  - {ext: "", db: ""}
 
-app_directory: "/opt/app"
 
 # postgresql parameters to bootstrap dcs (are parameters for example)
 postgresql_parameters:
@@ -209,6 +212,7 @@ postgresql_parameters:
 
 # specify additional hosts that will be added to the pg_hba.conf
 postgresql_pg_hba:
+  #- {type: "local", database: "all", user: "postgres", address: "", method: "trust"}  # "local=trust" required for ansible modules "postgresql_(user,db,ext)"
   - {type: "local", database: "all", user: "postgres", address: "", method: "trust"}  # "local=trust" required for ansible modules "postgresql_(user,db,ext)"
   - {type: "local", database: "all", user: "all", address: "", method: "peer"}
   - {type: "host", database: "all", user: "all", address: "127.0.0.1/32", method: "{{ postgresql_password_encryption_algorithm }}"}
@@ -350,14 +354,14 @@ basebackup:
 
 
 # "restore_command" written to recovery.conf when configuring follower (create replica)
-#postgresql_restore_command: ""
-postgresql_restore_command: "pgbackrest --stanza={{ pgbackrest_stanza }} archive-get %f %p"  # restore WAL-s using pgbackrest
+postgresql_restore_command: ""
+#postgresql_restore_command: "pgbackrest --stanza={{ pgbackrest_stanza }} archive-get %f %p"  # restore WAL-s using pgbackrest
 
 # pgBackRest
 pgbackrest_install: true  # 'false' or 'true'
 pgbackrest_install_from_pgdg_repo: true  # or 'false'
 pgbackrest_stanza: "postgresql-cluster"  # specify your --stanza
-pgbackrest_repo_type: "s3"  # or "s3"
+pgbackrest_repo_type: "posix"  # or "s3"
 pgbackrest_repo_host: "192.168.122.6"  # dedicated repository host (if repo_type: "posix")
 #pgbackrest_repo_host: "192.168.122.195"
 pgbackrest_repo_user: "pgbackrest"  # if "repo_host" is set
@@ -379,9 +383,6 @@ pgbackrest_conf:
     - {option: "repo1-type", value: "{{ pgbackrest_repo_type |lower }}"}
     - {option: "repo1-host", value: "{{ pgbackrest_repo_host }}"}
     - {option: "repo1-host-user", value: "{{ pgbackrest_repo_user }}"}
-    - {option: "repo1-retention-full", value: "{{ pgbackrest_retention_full_bkp }}"}
-    - {option: "repo1-retention-full-type", value: "{{ pgbackrest_retention_full_type }}"}
-    - {option: "start-fast", value: "{{ pgbackrest_start_fast }}"}        
 #    - {option: "", value: ""}
   stanza:  # [stanza_name] section
     - {option: "pg1-path", value: "{{ postgresql_data_dir }}"}
@@ -401,9 +402,6 @@ pgbackrest_conf_host:
   stanza:  # [stanza_name] section
     - {option: "pg1-path", value: "{{ postgresql_data_dir }}"}   
     - {option: "pg1-host", value: "{{ postgresql_master }}"}
-    - {option: "process-max", value: "2"}
-    - {option: "compress-level", value: "{{ pgbackrest_compress_level }}"}
-
 #    - {option: "", value: ""}
 
 

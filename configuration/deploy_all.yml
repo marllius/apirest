@@ -5,7 +5,7 @@
   hosts: localhost
   gather_facts: false
   vars_files:
-    - vars/main2.yml
+    - vars/main.yml
   vars:
     minimal_ansible_version: 2.7.0
   tasks:
@@ -23,7 +23,7 @@
   gather_facts: true
   any_errors_fatal: true
   vars_files:
-    - vars/main2.yml
+    - vars/main.yml
     - vars/system.yml
 
   roles:
@@ -54,7 +54,7 @@
   gather_facts: true
   any_errors_fatal: true
   vars_files:
-    - vars/main2.yml
+    - vars/main.yml
 
   roles:
     - role: pgbackrest
@@ -66,7 +66,7 @@
   gather_facts: true
   any_errors_fatal: true
   vars_files:
-    - vars/main2.yml
+    - vars/main.yml
     - vars/system.yml
 
   roles:
@@ -90,14 +90,13 @@
     - role: pgbouncer/userlist
       when: pgbouncer_install|bool
 
-
 - hosts: application
   become: true
   become_method: sudo
   gather_facts: true
   any_errors_fatal: true
   vars_files:
-    - vars/main2.yml
+    - vars/main.yml
     - vars/system.yml
 
   roles:
@@ -110,7 +109,7 @@
   gather_facts: true
   any_errors_fatal: true
   vars_files:
-    - vars/main2.yml
+    - vars/main.yml
     - vars/system.yml
 
   roles:

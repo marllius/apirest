@@ -19,9 +19,9 @@ In this configuration, you will deploy at least 13 hosts, 1 host of each type in
 - 1 pgbackrest repository
 - 2 Simple Storage Service (S3 buckets) with cross region replication for DR
 
-> **For testing proprose, you can use simples structure: pgnodes + etcd on the same server, using minimum 2 node. :warning: Using this configuration remember to add the secerity groups rules for this 3 on the same security :warning:**
+> **For testing proprose, you can use simples structure: pgnodes + etcd on the same server, using minimum 2 node. <br> :warning: Using this configuration remember to add the secerity groups rules for this 3 on the same security :warning:**
 
-# Problem specification for app
+# Problem specification for the app
 
 <details>
   <summary>Click for details</summary>
@@ -34,7 +34,7 @@ In this configuration, you will deploy at least 13 hosts, 1 host of each type in
 
 #### Description: Saves/updates the given user’s name and date of birth in the database.
 
-```json
+```console
 Request: PUT /hello/<username> { “dateOfBirth”: “YYYY-MM-DD” }
 Response: 204 No Content
 ```
@@ -46,7 +46,8 @@ Response: 204 No Content
 <br>
 
 #### Description:  Returns hello birthday message for the given user
-```json
+
+```console
 Request: Get /hello/<username>
 Response: 200 OK
 ```
@@ -54,12 +55,12 @@ Response: 200 OK
 Response Examples:
 
 A. If username’s birthday is in N days:
-```json
+```console
 { “message”: “Hello, <username>! Your birthday is in N day(s)”}
 ```
 
 B. If username’s birthday is today:
-```json
+```console
 { “message”: “Hello, <username>! Happy birthday!” }
 ```
 
@@ -189,13 +190,13 @@ Specify the ip addresses and connection settings (ansible_user, ansible_ssh_pass
 
 3) run the play book
 
-- Configure only the databases servers in HA 
-
 - deploy everything
 
 ```console
 ansible-playbook -i inventory/environment.yml deploy_all.yml
 ```
+
+- Configure only the databases servers in HA 
 
 ```console
 ansible-playbook -i inventory/environment.yml deploy_clusters.yml

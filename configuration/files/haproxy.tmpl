@@ -21,50 +21,50 @@ defaults
 
 listen stats
     mode http
-    bind 192.168.122.141:7000
+    bind 35.239.128.186:7000
     stats enable
     stats uri /
 
 listen master
-    bind 192.168.122.2:5000
+    bind 35.239.128.186:5000
     maxconn 10000
     option tcplog
     option httpchk OPTIONS /master
     http-check expect status 200
     default-server inter 3s fastinter 1s fall 3 rise 4 on-marked-down shutdown-sessions
-{{range gets "/members/*"}} server {{base .Key}} {{$data := json .Value}}{{base (replace (index (split (index (split $data.conn_url ":") 1) "/") 2) "@" "/" -1)}}:6432 check port {{index (split (index (split $data.api_url "/") 2) ":") 1}}
+{{range gets "/members/*"}} server {{base .Key}} {{$data := json .Value}}{{base (replace (index (split $data.conn_url "/") 2) "@" "/" -1)}} check port {{index (split (index (split $data.api_url "/") 2) ":") 1}}
 {{end}}
 
 listen replicas
-    bind 192.168.122.2:5001
+    bind 35.239.128.186:5001
     maxconn 10000
     option tcplog
     option httpchk OPTIONS /replica
     balance roundrobin
     http-check expect status 200
     default-server inter 3s fastinter 1s fall 3 rise 2 on-marked-down shutdown-sessions
-{{range gets "/members/*"}} server {{base .Key}} {{$data := json .Value}}{{base (replace (index (split (index (split $data.conn_url ":") 1) "/") 2) "@" "/" -1)}}:6432 check port {{index (split (index (split $data.api_url "/") 2) ":") 1}}
+{{range gets "/members/*"}} server {{base .Key}} {{$data := json .Value}}{{base (replace (index (split $data.conn_url "/") 2) "@" "/" -1)}} check port {{index (split (index (split $data.api_url "/") 2) ":") 1}}
 {{end}}
 
 listen replicas_sync
-    bind 192.168.122.2:5002
+    bind 35.239.128.186:5002
     maxconn 10000
     option tcplog
     option httpchk OPTIONS /sync
     balance roundrobin
     http-check expect status 200
     default-server inter 3s fastinter 1s fall 3 rise 2 on-marked-down shutdown-sessions
-{{range gets "/members/*"}} server {{base .Key}} {{$data := json .Value}}{{base (replace (index (split (index (split $data.conn_url ":") 1) "/") 2) "@" "/" -1)}}:6432 check port {{index (split (index (split $data.api_url "/") 2) ":") 1}}
+{{range gets "/members/*"}} server {{base .Key}} {{$data := json .Value}}{{base (replace (index (split $data.conn_url "/") 2) "@" "/" -1)}} check port {{index (split (index (split $data.api_url "/") 2) ":") 1}}
 {{end}}
 
 listen replicas_async
-    bind 192.168.122.2:5003
+    bind 35.239.128.186:5003
     maxconn 10000
     option tcplog
     option httpchk OPTIONS /async
     balance roundrobin
     http-check expect status 200
     default-server inter 3s fastinter 1s fall 3 rise 2 on-marked-down shutdown-sessions
-{{range gets "/members/*"}} server {{base .Key}} {{$data := json .Value}}{{base (replace (index (split (index (split $data.conn_url ":") 1) "/") 2) "@" "/" -1)}}:6432 check port {{index (split (index (split $data.api_url "/") 2) ":") 1}}
+{{range gets "/members/*"}} server {{base .Key}} {{$data := json .Value}}{{base (replace (index (split $data.conn_url "/") 2) "@" "/" -1)}} check port {{index (split (index (split $data.api_url "/") 2) ":") 1}}
 {{end}}
 
